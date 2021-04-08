@@ -1,0 +1,550 @@
+import GeometryRect from './geometry/rect';
+import GeometryCircle from './geometry/circle';
+import DrawingBase from './drawing-base';
+import { DrawingConst } from './constants';
+import './index.scss';
+import Helper from './helper';
+import { EVENT_END } from './events';
+import GeometryPolyline from './geometry/polyline';
+
+const marginTopText = DrawingConst.marginTopText;
+
+export default class Drawing extends DrawingBase {
+
+  get rects() {
+    const data = [];
+
+    this._data.forEach((geom, key) => {
+      if (geom instanceof GeometryRect) {
+        data.push({
+          id: key,
+          geom: geom
+        });
+      }
+    });
+
+    return data;
+  }
+
+  get circles() {
+    const data = [];
+
+    this._data.forEach((geom, key) => {
+      if (geom instanceof GeometryCircle) {
+        data.push({
+          id: key,
+          geom: geom
+        });
+      }
+    });
+
+    return data;
+  }
+
+  get area() {
+    let totalArea = 0;
+    this.geometries().forEach((geom) => {
+      totalArea += geom.area;
+    });
+
+    return totalArea;
+  }
+
+  _init() {
+    super._init();
+
+    // add event
+    this._containerDiv.addEventListener('keydown', (event) => {
+      const code = event.code.toUpperCase();
+      switch (code) {
+        case 'DELETE':
+          // delete obj selecting
+          const index = this._curGeomIndex;
+
+          if (index) {
+            this.removeGeometry(index);
+            this._svgOverlay
+              .selectAll(`rect[id=rect-${index}], circle[id=circle-${index}], line[id=line-${index}], g[id=g-rect-${index}], g[id=g-circle-${index}]`)
+              .remove();
+            this._overlay.draw();
+          }
+          break;
+      }
+    });
+
+    // create event for drawing tool
+
+  }
+
+  _onDrawOverlay() {
+    super._onDrawOverlay();
+
+    // update rectangle
+    this._updateRectangle();
+    // update circle
+    this._updateCircle();
+
+    // dispatchEvent
+    this._dispatchDrawingEvent();
+  }
+
+  _dispatchDrawingEvent() {
+    if (this._drawing) {
+      return;
+    }
+
+    if (typeof this._events.get(EVENT_END) === 'function') {
+      this._events.get(EVENT_END)(this._results());
+    }
+  }
+
+  _results() {
+    const totalArea = this.area;
+    return {
+      area: totalArea,
+      areaText: this._helper.formatArea(totalArea)
+    };
+  }
+
+  _mapClickFunc(evt) {
+    if (!this._dragged
+    && this._touchCircles.selectAll(`circle[r="${DrawingConst.nodeTargetExpandRadius}"]`).size() === 0) {
+      const node = [evt.latLng.lng(), evt.latLng.lat()];
+
+      // is rect drawing
+      if (this.geometry() instanceof GeometryRect) {
+        this.geometry().setFirstPoint(node);
+        this._mapClickEvent.remove();
+
+        this._mapRectMouseMoveEvent = this._map.addListener('mousemove', (evt2) => {
+          this.geometry().setEndPoint([evt2.latLng.lng(), evt2.latLng.lat()]);
+          this._overlay.draw();
+          this._dragged = false;
+        });
+
+        this._mapClickEvent = this._map.addListener('click', (evt2) => {
+          this.geometry().setEndPoint([evt2.latLng.lng(), evt2.latLng.lat()]);
+          this._mapClickEvent.remove();
+          this._mapRectMouseMoveEvent.remove();
+          this.drawEnd();
+        });
+      }
+
+      // is circle drawing
+      if (this.geometry() instanceof GeometryCircle) {
+        this.geometry().setCenter(node);
+        this._mapClickEvent.remove();
+
+        this._mapCircleMouseMoveEvent = this._map.addListener('mousemove', (evt2) => {
+          this.geometry().setEndPoint([evt2.latLng.lng(), evt2.latLng.lat()]);
+          this._overlay.draw();
+          this._dragged = false;
+        });
+
+        this._mapClickEvent = this._map.addListener('click', (evt2) => {
+          this.geometry().setEndPoint([evt2.latLng.lng(), evt2.latLng.lat()]);
+          this._mapClickEvent.remove();
+          this._mapCircleMouseMoveEvent.remove();
+          this.drawEnd();
+        });
+      }
+    }
+
+    super._mapClickFunc(evt);
+  }
+
+  onCircleDragging(evt, i) {
+    super.onCircleDragging(evt, i);
+
+    if (this.geometry() instanceof GeometryRect) {
+      this._updateRectPosition(i, evt);
+      this._updateRectNode(i, evt);
+      this._updateNodeCircles();
+      this._updateSegmentTextRect();
+    }
+
+    if (this.geometry() instanceof GeometryCircle) {
+      this._updateCirclePosition(i, evt);
+      this._updateCircleNode(i, evt);
+      this._updateNodeCircles();
+      this._updateSegmentTextCircle();
+    }
+  }
+
+  // draw polyline start ==================
+  drawPolyline() {
+    if (this._drawing === 'polyline') {
+      return;
+    }
+
+    this.addGeometry(new GeometryPolyline());
+    this._draw();
+    this._drawing = 'polyline';
+  }
+  // draw polyline end ====================
+
+  // draw circle start ====================
+  drawCircle() {
+    if (this._drawing === 'circle') {
+      return;
+    }
+
+    this.addGeometry(new GeometryCircle(this._projectionUtils));
+    this._draw();
+    this._drawing = 'circle';
+  }
+
+  _updateCircle() {
+    const circles = this._svgObjs.selectAll('circle')
+      .data(this.circles)
+      .attr('class', 'base-line')
+      .attr('cx', d => this._projectionUtils.latLngToSvgPoint(d.geom.center)[0])
+      .attr('cy', d => this._projectionUtils.latLngToSvgPoint(d.geom.center)[1])
+      .attr('r', d => {
+        const center = d.geom.center;
+        const endpoint = d.geom.endpoint;
+        let r = 0; // radius
+
+        if (center.length && endpoint.length) {
+          const point1 = this._projectionUtils.latLngToSvgPoint(center);
+          const point2 = this._projectionUtils.latLngToSvgPoint(endpoint);
+          const a = Math.abs(point1[0] - point2[0]);
+          const b = Math.abs(point1[1] - point2[1]);
+          r = Math.sqrt(Math.pow(a, 2) + Math.pow(b, 2));
+        }
+
+        return r || 1;
+      });
+
+    if (this.geometry() instanceof GeometryCircle) {
+      const center = this.geometry().center;
+      const endpoint = this.geometry().endpoint;
+
+      if (center.length && endpoint.length) {
+        const point1 = this._projectionUtils.latLngToSvgPoint(center);
+        const point2 = this._projectionUtils.latLngToSvgPoint(endpoint);
+        const a = Math.abs(point1[0] - point2[0]);
+        const b = Math.abs(point1[1] - point2[1]);
+        const r = Math.sqrt(Math.pow(a, 2) + Math.pow(b, 2));
+
+        circles.enter()
+          .append('circle')
+          .attr('id', `circle-${this._curGeomIndex}`)
+          .attr('class', 'base-line')
+          .attr('cx', point1[0])
+          .attr('cy', point1[1])
+          .attr('r', r || 1);
+      }
+    }
+
+    this._updateSegmentTextCircle();
+  }
+
+  _updateSegmentTextCircle() {
+    const groups = this._segmentText
+      .selectAll('g[id^=g-circle-]')
+      .data(this.circles);
+
+    groups
+      .enter()
+      .append('g')
+      .attr('id', d => `g-circle-${d.id}`);
+
+    const text = groups
+      .selectAll('text')
+      .data(d => this.geometry(d.id).lines)
+      .attr('class', 'segment-measure-text')
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'text-before-edge')
+      .attr('transform', (d) => {
+        let p1 = this._projectionUtils.latLngToSvgPoint(d[0]);
+        let p2 = this._projectionUtils.latLngToSvgPoint(d[1]);
+        return Helper.transformText(p1, p2, marginTopText);
+      })
+      .text(d => this._helper.formatLength(this._helper.computeLengthBetween(d[0], d[1])));
+
+    text
+      .enter()
+      .append('text')
+      .attr('class', 'segment-measure-text')
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'text-before-edge')
+      .attr('transform', (d) => {
+        let p1 = this._projectionUtils.latLngToSvgPoint(d[0]);
+        let p2 = this._projectionUtils.latLngToSvgPoint(d[1]);
+        return Helper.transformText(p1, p2, marginTopText);
+      })
+      .text(d => this._helper.formatLength(this._helper.computeLengthBetween(d[0], d[1])));
+
+    text.exit().remove();
+  }
+
+  _updateCirclePosition(i, evt) {
+    const circle = this._svgObjs.select(`circle[id=circle-${this._curGeomIndex}]`);
+    if (circle.size() === 0) {
+      return;
+    }
+
+    let x = Number(circle.attr('cx'));
+    let y = Number(circle.attr('cy'));
+    let r = Number(circle.attr('r'));
+
+    switch(i) {
+      case 0: // move rect
+        x = evt.x;
+        y = evt.y;
+        break;
+      case 1:
+      case 3:
+        r = Math.abs(evt.y - y);
+        break;
+      case 2:
+      case 4:
+        r = Math.abs(evt.x - x);
+        break;
+    }
+
+    circle.attr('cx', x)
+      .attr('cy', y)
+      .attr('r', r);
+  }
+
+  _updateCircleNode(i, evt) {
+    const point = this._projectionUtils.svgPointToLatLng([evt.x, evt.y]);
+
+    switch(i) {
+      case 0: // move circle
+        const r = this.geometry().svgRadius;
+        const endpoint = [evt.x + r, evt.y];
+        // // set center
+        this.geometry().setCenter(point);
+        // // set end point
+        this.geometry().setEndPoint(this._projectionUtils.svgPointToLatLng(endpoint));
+        break;
+      case 1:
+      case 2:
+      case 3:
+      case 4:
+        this.geometry().setEndPoint(point);
+        break;
+    }
+  }
+  // draw circle end ====================
+
+  // draw rectangle start ====================
+  drawRectangle() {
+    if (this._drawing === 'rect') {
+      return;
+    }
+
+    this.addGeometry(new GeometryRect());
+    this._draw();
+    this._drawing = 'rect';
+  }
+
+  _updateRectPosition(i, evt) {
+    const rect = this._svgObjs.select(`rect[id=rect-${this._curGeomIndex}]`);
+    if (rect.size() === 0) {
+      return;
+    }
+
+    let x = Number(rect.attr('x'));
+    let y = Number(rect.attr('y'));
+    let w = Number(rect.attr('width'));
+    let h = Number(rect.attr('height'));
+    const point2 = [x + w, y + h];
+
+    switch(i) {
+      case 0: // move rect
+        const mid = [x + w / 2, y + h / 2];
+        x += evt.x - mid[0];
+        y += evt.y - mid[1];
+        break;
+      case 1:
+        x = evt.x;
+        y = evt.y;
+        w = Math.abs(x - point2[0]);
+        h = Math.abs(y - point2[1]);
+        break;
+      case 2:
+        y = evt.y;
+        w = Math.abs(evt.x - x);
+        h = Math.abs(point2[1] - y);
+        break;
+      case 3:
+        w = Math.abs(evt.x - x);
+        h = Math.abs(evt.y - y);
+        break;
+      case 4:
+        x = evt.x;
+        w = Math.abs(x - point2[0]);
+        h = Math.abs(y - evt.y);
+        break;
+    }
+
+    rect.attr('x', x)
+      .attr('y', y)
+      .attr('width', w)
+      .attr('height', h);
+  }
+
+  _updateRectNode(i, evt) {
+    const rect = this._svgObjs.select(`rect[id=rect-${this._curGeomIndex}]`);
+    if (rect.size() === 0) {
+      return;
+    }
+
+    const point = this._projectionUtils.svgPointToLatLng([evt.x, evt.y]);
+    const coordinates = this.geometry().coordinates;
+
+    switch(i) {
+      case 0: // move rect
+        let x = Number(rect.attr('x'));
+        let y = Number(rect.attr('y'));
+        const w = Number(rect.attr('width'));
+        const h = Number(rect.attr('height'));
+        const mid = [x + w / 2, y + h / 2];
+        x += evt.x - mid[0];
+        y += evt.y - mid[1];
+        const x2 = x + w;
+        const y2 = y + h;
+        this.geometry().setFirstPoint(this._projectionUtils.svgPointToLatLng([x, y]));
+        this.geometry().setEndPoint(this._projectionUtils.svgPointToLatLng([x2, y2]));
+        break;
+      case 1:
+        this.geometry().setFirstPoint(point);
+        this.geometry().setEndPoint(coordinates[2]);
+        break;
+      case 2:
+        this.geometry().setFirstPoint([coordinates[0][0], point[1]]);
+        this.geometry().setEndPoint([point[0], coordinates[2][1]]);
+        break;
+      case 3:
+        this.geometry().setEndPoint(point);
+        break;
+      case 4:
+        this.geometry().setFirstPoint([point[0], coordinates[0][1]]);
+        this.geometry().setEndPoint([coordinates[2][0], point[1]]);
+        break;
+    }
+  }
+
+  _updateRectangle() {
+    const rects = this._svgObjs.selectAll('rect')
+      .data(this.rects)
+      .attr('class', 'base-line')
+      .attr('x', d => this._projectionUtils.latLngToSvgPoint(d.geom.coordinates[0])[0])
+      .attr('y', d => this._projectionUtils.latLngToSvgPoint(d.geom.coordinates[0])[1])
+      .attr('width', d => {
+        const coord1 = d.geom.coordinates[0];
+        const coord2 = d.geom.coordinates[2];
+        let w = 0;
+
+        if (coord1 && coord1.length && coord2 && coord2.length) {
+          const point1 = this._projectionUtils.latLngToSvgPoint(coord1);
+          const point2 = this._projectionUtils.latLngToSvgPoint(coord2);
+          w = Number(point2[0]) - Number(point1[0]);
+        }
+
+        return w;
+      })
+      .attr('height', d => {
+        const coord1 = d.geom.coordinates[0];
+        const coord2 = d.geom.coordinates[2];
+        let h = 0;
+
+        if (coord1 && coord1.length && coord2 && coord2.length) {
+          const point1 = this._projectionUtils.latLngToSvgPoint(coord1);
+          const point2 = this._projectionUtils.latLngToSvgPoint(coord2);
+          h = Number(point2[1]) - Number(point1[1])
+        }
+
+        return h;
+      });
+
+    if (this.geometry() instanceof GeometryRect) {
+      const coord1 = this.geometry().coordinates[0];
+      const coord2 = this.geometry().coordinates[2];
+
+      if (coord1 && coord1.length && coord2 && coord2.length) {
+        const point1 = this._projectionUtils.latLngToSvgPoint(coord1);
+        const point2 = this._projectionUtils.latLngToSvgPoint(coord2);
+        const w = Number(point2[0]) - Number(point1[0]);
+        const h = Number(point2[1]) - Number(point1[1]);
+
+        rects.enter()
+          .append('rect')
+          .attr('id', `rect-${this._curGeomIndex}`)
+          .attr('class', 'base-line')
+          .attr('x', point1[0])
+          .attr('y', point1[1])
+          .attr('width', w)
+          .attr('height', h);
+      }
+    }
+
+    this._updateSegmentTextRect();
+  }
+
+  _updateSegmentTextRect() {
+    const groups = this._segmentText
+      .selectAll('g[id^=g-rect-]')
+      .data(this.rects);
+
+    groups
+      .enter()
+      .append('g')
+      .attr('id', d => `g-rect-${d.id}`);
+
+    const text = groups
+      .selectAll('text')
+      .data(d => this.geometry(d.id).lines)
+      .attr('class', 'segment-measure-text')
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'text-before-edge')
+      .attr('transform', (d) => {
+        let p1 = this._projectionUtils.latLngToSvgPoint(d[0]);
+        let p2 = this._projectionUtils.latLngToSvgPoint(d[1]);
+        return Helper.transformText(p1, p2, marginTopText);
+      })
+      .text(d => this._helper.formatLength(this._helper.computeLengthBetween(d[0], d[1])));
+
+    text
+      .enter()
+      .append('text')
+      .attr('class', 'segment-measure-text')
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'text-before-edge')
+      .attr('transform', (d) => {
+        let p1 = this._projectionUtils.latLngToSvgPoint(d[0]);
+        let p2 = this._projectionUtils.latLngToSvgPoint(d[1]);
+        return Helper.transformText(p1, p2, marginTopText);
+      })
+      .text(d => this._helper.formatLength(this._helper.computeLengthBetween(d[0], d[1])));
+
+    text.exit().remove();
+  }
+  // draw rectangle end ====================
+
+  drawEnd() {
+    if (!this._drawing) {
+      return;
+    }
+
+    this._drawing = null;
+    this._overlay.draw();
+    this._dragged = false;
+
+    this._svgOverlayEvent = this._svgOverlay.on('click', (evt) => {
+      if (evt.target.id.match(/(rect|line|circle)\-(\d+)/g)) {
+        const id = evt.target.id.match(/(rect|line|circle)\-(\d+)/)[2];
+        this._curGeomIndex = Number(id);
+      } else {
+        this._curGeomIndex = 0;
+      }
+
+      this._overlay.draw();
+      this._dragged = false;
+    });
+  }
+}

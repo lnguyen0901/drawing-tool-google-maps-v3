@@ -1,0 +1,55 @@
+$alpha-white: rgba(255, 255, 255, 0.4);
+$alpha-black: rgba(0, 0, 0, 1);
+
+.drawing-tool-svg-overlay {
+  position: absolute;
+  top: -4000px;
+  left: -4000px;
+  width: 8000px;
+  height: 8000px;
+}
+
+.cover-circle {
+  fill: white;
+  stroke: black;
+  stroke-width: 2px;
+}
+
+.touch-circle {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.grey-circle {
+  fill: rgb(252, 252, 252);
+  stroke: rgb(100, 100, 100);
+  stroke-width: 2px;
+  pointer-events: none;
+}
+
+.base-line {
+  fill: rgba(170, 218, 255, 0.3);
+  stroke: black;
+  stroke-width: 2px;
+  stroke-dasharray: 2;
+}
+
+.segment-measure-text {
+  pointer-events: none;
+  stroke: black;
+  text-shadow: -2.4px -2.4px $alpha-white, -2.4px 2.4px $alpha-white,
+    2.4px 2.4px $alpha-white, 2.4px -2.4px $alpha-white, -2.4px 0 $alpha-white,
+    0 2.4px $alpha-white, 2.4px 0 $alpha-white, 0 -2.4px $alpha-white;
+}
+
+.node-measure-text {
+  stroke: black;
+  text-shadow: -2.4px -2.4px $alpha-white, -2.4px 2.4px $alpha-white,
+    2.4px 2.4px $alpha-white, 2.4px -2.4px $alpha-white, -2.4px 0 $alpha-white,
+    0 2.4px $alpha-white, 2.4px 0 $alpha-white, 0 -2.4px $alpha-white;
+  pointer-events: none;
+
+  &.head-text {
+    visibility: hidden;
+  }
+}
