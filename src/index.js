@@ -287,20 +287,12 @@ export default class Drawing extends DrawingBase {
 
     let x = Number(circle.attr('cx'));
     let y = Number(circle.attr('cy'));
-    let r = Number(circle.attr('r'));
+    const r = this.geometry().svgRadius;
 
     switch(i) {
       case 0: // move rect
         x = evt.x;
         y = evt.y;
-        break;
-      case 1:
-      case 3:
-        r = Math.abs(evt.y - y);
-        break;
-      case 2:
-      case 4:
-        r = Math.abs(evt.x - x);
         break;
     }
 
@@ -325,7 +317,12 @@ export default class Drawing extends DrawingBase {
       case 2:
       case 3:
       case 4:
-        this.geometry().setEndPoint(point);
+        const center = this._projectionUtils.latLngToSvgPoint(this.geometry().center);
+        const a = Math.abs(center[0] - evt.x);
+        const b = Math.abs(center[1] - evt.y);
+        const radius = Math.sqrt(Math.pow(a, 2) + Math.pow(b, 2));
+
+        this.geometry().setEndPoint(this._projectionUtils.svgPointToLatLng([center[0], center[1] + radius]));
         break;
     }
   }
