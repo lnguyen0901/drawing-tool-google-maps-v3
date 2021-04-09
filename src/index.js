@@ -5,7 +5,7 @@ import { DrawingConst } from './constants';
 import './index.scss';
 import Helper from './helper';
 import { EVENT_END } from './events';
-import GeometryPolyline from './geometry/polyline';
+import GeometryPolygon from './geometry/polygon';
 
 const marginTopText = DrawingConst.marginTopText;
 
@@ -41,6 +41,21 @@ export default class Drawing extends DrawingBase {
     return data;
   }
 
+  get polygons() {
+    const data = [];
+
+    this._data.forEach((geom, key) => {
+      if (geom instanceof GeometryPolygon) {
+        data.push({
+          id: key,
+          geom: geom
+        });
+      }
+    });
+
+    return data;
+  }
+
   get area() {
     let totalArea = 0;
     this.geometries().forEach((geom) => {
@@ -63,8 +78,12 @@ export default class Drawing extends DrawingBase {
 
           if (index) {
             this.removeGeometry(index);
+            let selectors = `rect[id=rect-${index}], circle[id=circle-${index}], line[id=line-${index}],`;
+            selectors += `g[id=g-rect-${index}], g[id=g-circle-${index}],`;
+            selectors += `polygon[id=polygon-${index}], g[id=gpolygon-${index}], g[id=g-polygon-${index}]`;
+
             this._svgOverlay
-              .selectAll(`rect[id=rect-${index}], circle[id=circle-${index}], line[id=line-${index}], g[id=g-rect-${index}], g[id=g-circle-${index}]`)
+              .selectAll(selectors)
               .remove();
             this._overlay.draw();
           }
@@ -83,6 +102,8 @@ export default class Drawing extends DrawingBase {
     this._updateRectangle();
     // update circle
     this._updateCircle();
+    // update polygon
+    this._updatePolygon();
 
     // dispatchEvent
     this._dispatchDrawingEvent();
@@ -148,6 +169,20 @@ export default class Drawing extends DrawingBase {
           this.drawEnd();
         });
       }
+
+      // polygon drawing
+      if (this.geometry() instanceof GeometryPolygon) {
+        this.geometry().addPoint(node);
+        this._overlay.draw();
+
+        this._mapPolygonClickEvent = this._map.addListener('rightclick', () => {
+          // this.geometry().addPoint(this.geometry().nodes[0]);
+          this.geometry().setClosed();
+          this._mapClickEvent.remove();
+          this._mapPolygonClickEvent.remove();
+          this.drawEnd();
+        });
+      }
     }
 
     super._mapClickFunc(evt);
@@ -169,19 +204,172 @@ export default class Drawing extends DrawingBase {
       this._updateNodeCircles();
       this._updateSegmentTextCircle();
     }
+
+    if (this.geometry() instanceof GeometryPolygon) {
+      this._updatePolygonPosition(i, evt);
+      this._updatePolygonNode(i, evt);
+      this._updateNodeCircles();
+      this._updateSegmentTextPolygon();
+    }
   }
 
-  // draw polyline start ==================
-  drawPolyline() {
-    if (this._drawing === 'polyline') {
+  // draw polygon start ==================
+  drawPolygon() {
+    if (this._drawing === 'polygon') {
       return;
     }
 
-    this.addGeometry(new GeometryPolyline());
+    this.addGeometry(new GeometryPolygon());
     this._draw();
-    this._drawing = 'polyline';
+    this._drawing = 'polygon';
   }
-  // draw polyline end ====================
+
+  _updatePolygon() {
+    const polygons = this._svgObjs.selectAll('polygon[id^=polygon-]')
+      .data(this.polygons)
+      .attr('class', d => `base-line${this.geometry(d.id).isClosed ? '' : ' none'}`)
+      .attr('points', d => {
+        const nodes = this.geometry(d.id).coordinates;
+        let points = [];
+
+        nodes.forEach((node) => {
+          const s = this._projectionUtils.latLngToSvgPoint(node);
+          points.push(`${s[0]},${s[1]}`);
+        });
+
+        return points.join(' ');
+      });
+
+    if (this.geometry() instanceof GeometryPolygon) {
+      polygons.enter()
+        .append('polygon')
+        .attr('id', d => `polygon-${d.id}`)
+        .attr('class', `base-line none`)
+        .attr('points', d => {
+          const nodes = this.geometry(d.id).coordinates;
+          let points = [];
+
+          nodes.forEach((node) => {
+            const s = this._projectionUtils.latLngToSvgPoint(node);
+            points.push(`${s[0]},${s[1]}`);
+          });
+
+          return points.join(' ');
+        });
+    }
+
+    const gpolygons = this._svgObjs.selectAll('g[id^=gpolygon-]')
+      .data(this.polygons)
+      .attr('id', d => `gpolygon-${d.id}`)
+      .attr('class', d => `${this.geometry(d.id).isClosed ? 'none' : ''}`);
+
+    gpolygons
+      .enter()
+      .append('g')
+      .attr('id', d => `gpolygon-${d.id}`)
+      .attr('class', d => `${this.geometry(d.id).isClosed ? 'none' : ''}`);
+
+    const lines = gpolygons
+      .selectAll('line')
+      .data(d => this.geometry(d.id).lines)
+      .attr('class', 'base-line')
+      .attr('x1', d => this._projectionUtils.latLngToSvgPoint(d[0])[0])
+      .attr('y1', d => this._projectionUtils.latLngToSvgPoint(d[0])[1])
+      .attr('x2', d => this._projectionUtils.latLngToSvgPoint(d[1])[0])
+      .attr('y2', d => this._projectionUtils.latLngToSvgPoint(d[1])[1]);
+
+    lines.enter()
+      .append('line')
+      .attr('class', 'base-line')
+      .attr('x1', d => this._projectionUtils.latLngToSvgPoint(d[0])[0])
+      .attr('y1', d => this._projectionUtils.latLngToSvgPoint(d[0])[1])
+      .attr('x2', d => this._projectionUtils.latLngToSvgPoint(d[1])[0])
+      .attr('y2', d => this._projectionUtils.latLngToSvgPoint(d[1])[1]);
+
+    this._updateSegmentTextPolygon();
+  }
+
+  _updateSegmentTextPolygon() {
+    const groups = this._segmentText
+      .selectAll('g[id^=g-polygon-]')
+      .data(this.polygons);
+
+    groups
+      .enter()
+      .append('g')
+      .attr('id', d => `g-polygon-${d.id}`);
+
+    const text = groups
+      .selectAll('text')
+      .data(d => this.geometry(d.id).lines)
+      .attr('class', 'segment-measure-text')
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'text-before-edge')
+      .attr('transform', (d) => {
+        let p1 = this._projectionUtils.latLngToSvgPoint(d[0]);
+        let p2 = this._projectionUtils.latLngToSvgPoint(d[1]);
+        return Helper.transformText(p1, p2, marginTopText);
+      })
+      .text(d => this._helper.formatLength(this._helper.computeLengthBetween(d[0], d[1])));
+
+    text
+      .enter()
+      .append('text')
+      .attr('class', 'segment-measure-text')
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'text-before-edge')
+      .attr('transform', (d) => {
+        let p1 = this._projectionUtils.latLngToSvgPoint(d[0]);
+        let p2 = this._projectionUtils.latLngToSvgPoint(d[1]);
+        return Helper.transformText(p1, p2, marginTopText);
+      })
+      .text(d => this._helper.formatLength(this._helper.computeLengthBetween(d[0], d[1])));
+
+    text.exit().remove();
+  }
+
+  _updatePolygonPosition(i, evt) {
+    const polygon = this._svgObjs.select(`polygon[id=polygon-${this._curGeomIndex}]`);
+    if (polygon.size() === 0) {
+      return;
+    }
+
+    let points = polygon.attr('points').split(' ').map((d) => d.split(',').map(e => Number(e)));
+
+    if (i === points.length) { // move polygon
+      // re-calculate points
+      const center = this._projectionUtils.latLngToSvgPoint(this.geometry().center);
+      points = points.map(node => {
+        node[0] += evt.x - center[0];
+        node[1] += evt.y - center[1];
+        return node;
+      });
+    } else {
+      points[i] = [evt.x, evt.y];
+    }
+
+    polygon.attr('points', () => {
+      return points.map(d => d.join(',')).join(' ');
+    });
+  }
+
+  _updatePolygonNode(i, evt) {
+    const point = this._projectionUtils.svgPointToLatLng([evt.x, evt.y]);
+
+    if (i === this.geometry().coordinates.length) { // move polygon
+      // re-calculate points
+      const center = this.geometry().center;
+      const coordinates = this.geometry().coordinates.map(coord => {
+        coord[0] += point[0] - center[0];
+        coord[1] += point[1] - center[1];
+        return coord;
+      });
+      this.geometry().updatePoints(coordinates);
+    } else {
+      this.geometry().updatePoint(i, point);
+    }
+  }
+  // draw polygon end ====================
 
   // draw circle start ====================
   drawCircle() {
@@ -533,8 +721,8 @@ export default class Drawing extends DrawingBase {
     this._dragged = false;
 
     this._svgOverlayEvent = this._svgOverlay.on('click', (evt) => {
-      if (evt.target.id.match(/(rect|line|circle)\-(\d+)/g)) {
-        const id = evt.target.id.match(/(rect|line|circle)\-(\d+)/)[2];
+      if (evt.target.id.match(/(rect|polygon|circle)\-(\d+)/g)) {
+        const id = evt.target.id.match(/(rect|polygon|circle)\-(\d+)/)[2];
         this._curGeomIndex = Number(id);
       } else {
         this._curGeomIndex = 0;
