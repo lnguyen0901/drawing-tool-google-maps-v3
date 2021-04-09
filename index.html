@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Example Map</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="utf-8" />
+    <style>
+      /* Always set the map height explicitly to define the size of the div
+     * element that contains the map. */
+      #map {
+        height: 100%;
+      }
+      /* Optional: Makes the sample page fill the window. */
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      #controls {
+        position: absolute;
+        top: 100px;
+        left: 10px;
+        display: flex;
+        flex-direction: column;
+      }
+      #area {
+        position: absolute;
+        top: 55px;
+        right: 10px;
+        background: #fff;
+        color: red;
+        font-weight: bold;
+        font-size: 12px;
+        padding: 5px;
+        font-family: Roboto, Arial, sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="controls">
+      <button id="rectangle">Rectangle</button>
+      <button id="circle">Circle</button>
+      <button id="polygon">Polygon</button>
+    </div>
+    <div id="area"></div>
+    <script src="./gmaps-drawing-tool.umd.js"></script>
+    <script>
+      const center = { lat: 41.7, lng: -71.47 };
+
+      var map, drawing;
+      function initMap() {
+        map = new google.maps.Map(document.getElementById('map'), {
+          center,
+          zoom: 9,
+          scaleControl: true,
+        });
+        drawing = new DrawingMeasure(map);
+
+        drawing.addListener('draw_end', (e) => {
+          document.getElementById('area').innerHTML = e.areaText;
+          // drawing.removeListener('draw_end');
+        });
+      }
+
+      document
+        .querySelector('#rectangle')
+        .addEventListener('click', () => drawing.drawRectangle());
+      document
+        .querySelector('#circle')
+        .addEventListener('click', () => drawing.drawCircle());
+      document
+        .querySelector('#polygon')
+        .addEventListener('click', () => drawing.drawPolygon());
+    </script>
+    <script
+      src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA568XwvofR7KNTZg0usA6Y9q6G2aiEHks&libraries=geometry&callback=initMap"
+      async
+      defer
+    ></script>
+  </body>
+</html>
