@@ -40,12 +40,14 @@
   <body>
     <div id="map"></div>
     <div id="controls">
+      <button id="init">Init Data</button>
+      <button id="data">Data</button>
       <button id="rectangle">Rectangle</button>
       <button id="circle">Circle</button>
       <button id="polygon">Polygon</button>
     </div>
     <div id="area"></div>
-    <script src="./gmaps-drawing-tool.umd.js"></script>
+    <script src="../dist/gmaps-drawing-tool.umd.js"></script>
     <script>
       const center = { lat: 41.7, lng: -71.47 };
 
@@ -64,6 +66,39 @@
         });
       }
 
+      var data = [
+        {
+          type: 'circle',
+          center: [-71.72955200195311, 42.10169995470586],
+          radius: 46528.560541904895
+        },
+        {
+          type: 'polygon',
+          coordinates: [
+            [-71.97399780273436, 41.38444699474679],
+            [-71.73229858398436, 41.231773865537164],
+            [-71.28735229492186, 41.361774963613556],
+            [-71.25439331054686, 41.528538376228],
+            [-71.45764038085936, 41.59841009468815]
+          ]
+        },
+        {
+          type: 'rect',
+          coordinates: [
+            [-71.90807983398436, 42.10985080225567],
+            [-71.05663940429686, 42.10985080225567],
+            [-71.05663940429686, 41.828041191965895],
+            [-71.90807983398436, 41.828041191965895]
+          ]
+        }
+      ];
+
+      document
+        .querySelector('#init')
+        .addEventListener('click', () => drawing.setData(data));
+      document
+        .querySelector('#data')
+        .addEventListener('click', () => console.log(drawing.data()));
       document
         .querySelector('#rectangle')
         .addEventListener('click', () => drawing.drawRectangle());
