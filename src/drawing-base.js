@@ -222,6 +222,20 @@ export default class DrawingBase {
       this._svgOverlayEvent = null;
     }
 
+    if (this._mapRectMouseMoveEvent) {
+      this._mapRectMouseMoveEvent.remove();
+    }
+    if (this._mapCircleMouseMoveEvent) {
+      this._mapCircleMouseMoveEvent.remove();
+    }
+    if (this._mapPolygonClickEvent) {
+      this._mapPolygonClickEvent.remove();
+    }
+
+    if (this._mapClickEvent) {
+      this._mapClickEvent.remove();
+    }
+
     this._mapClickEvent = this._map.addListener('click', evt => this._mapClickFunc(evt));
 
     this._map.setOptions({

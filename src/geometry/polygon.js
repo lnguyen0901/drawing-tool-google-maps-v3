@@ -67,10 +67,19 @@ export default class GeometryPolygon extends GeometryBase {
     return [xMin + (xMax - xMin) / 2, yMin + (yMax - yMin) / 2];
   }
 
-  constructor() {
+  get isValid() {
+    return this._closed === true;
+  }
+
+  constructor(data) {
     super();
     this._closed = false;
     this._coordinates = [];
+
+    if (data) {
+      this._closed = true;
+      this._coordinates = data.coordinates;
+    }
   }
 
   addPoint(point) {
@@ -87,5 +96,12 @@ export default class GeometryPolygon extends GeometryBase {
 
   setClosed() {
     this._closed = true;
+  }
+
+  data() {
+    return {
+      type: 'polygon',
+      coordinates: this.coordinates
+    };
   }
 }

@@ -78,14 +78,6 @@ export default class Drawing extends DrawingBase {
 
           if (index) {
             this.removeGeometry(index);
-            let selectors = `rect[id=rect-${index}], circle[id=circle-${index}], line[id=line-${index}],`;
-            selectors += `g[id=g-rect-${index}], g[id=g-circle-${index}],`;
-            selectors += `polygon[id=polygon-${index}], g[id=gpolygon-${index}], g[id=g-polygon-${index}]`;
-
-            this._svgOverlay
-              .selectAll(selectors)
-              .remove();
-            this._overlay.draw();
           }
           break;
       }
@@ -125,6 +117,53 @@ export default class Drawing extends DrawingBase {
       area: totalArea,
       areaText: this._helper.formatArea(totalArea)
     };
+  }
+
+  setData(data) {
+    if (!data) {
+      return;
+    }
+
+    data.forEach(geom => {
+      switch(geom.type) {
+        case 'circle':
+          this.addGeometry(new GeometryCircle(this._projectionUtils, geom));
+          break;
+        case 'rect':
+          this.addGeometry(new GeometryRect(geom));
+          break;
+        case 'polygon':
+          this.addGeometry(new GeometryPolygon(geom));
+          break;
+      }
+      this.drawEnd(true);
+    });
+
+    this._curGeomIndex = 0;
+    this._overlay.draw();
+    this._dragged = false;
+  }
+
+  data() {
+    let data = [];
+    this.geometries().forEach(geom => {
+      data.push(geom.data());
+    });
+
+    return data;
+  }
+
+  removeGeometry(index) {
+    super.removeGeometry(index);
+
+    let selectors = `rect[id=rect-${index}], circle[id=circle-${index}], line[id=line-${index}],`;
+      selectors += `g[id=g-rect-${index}], g[id=g-circle-${index}],`;
+      selectors += `polygon[id=polygon-${index}], g[id=gpolygon-${index}], g[id=g-polygon-${index}]`;
+
+    this._svgOverlay
+      .selectAll(selectors)
+      .remove();
+    this._overlay.draw();
   }
 
   _mapClickFunc(evt) {
@@ -219,6 +258,13 @@ export default class Drawing extends DrawingBase {
       return;
     }
 
+    // remove geometries not valid
+    this.geometries().forEach((geom, index) => {
+      if (!geom.isValid) {
+        this.removeGeometry(index);
+      }
+    });
+
     this.addGeometry(new GeometryPolygon());
     this._draw();
     this._drawing = 'polygon';
@@ -227,9 +273,9 @@ export default class Drawing extends DrawingBase {
   _updatePolygon() {
     const polygons = this._svgObjs.selectAll('polygon[id^=polygon-]')
       .data(this.polygons)
-      .attr('class', d => `base-line${this.geometry(d.id).isClosed ? '' : ' none'}`)
+      .attr('class', d => `base-line${d.geom.isClosed ? '' : ' none'}`)
       .attr('points', d => {
-        const nodes = this.geometry(d.id).coordinates;
+        const nodes = d.geom.coordinates;
         let points = [];
 
         nodes.forEach((node) => {
@@ -244,7 +290,7 @@ export default class Drawing extends DrawingBase {
       polygons.enter()
         .append('polygon')
         .attr('id', d => `polygon-${d.id}`)
-        .attr('class', `base-line none`)
+        .attr('class', d => `base-line${this.geometry(d.id).isClosed ? '' : ' none'}`)
         .attr('points', d => {
           const nodes = this.geometry(d.id).coordinates;
           let points = [];
@@ -376,6 +422,13 @@ export default class Drawing extends DrawingBase {
     if (this._drawing === 'circle') {
       return;
     }
+
+    // remove geometries not valid
+    this.geometries().forEach((geom, index) => {
+      if (!geom.isValid) {
+        this.removeGeometry(index);
+      }
+    });
 
     this.addGeometry(new GeometryCircle(this._projectionUtils));
     this._draw();
@@ -521,6 +574,13 @@ export default class Drawing extends DrawingBase {
     if (this._drawing === 'rect') {
       return;
     }
+
+    // remove geometries not valid
+    this.geometries().forEach((geom, index) => {
+      if (!geom.isValid) {
+        this.removeGeometry(index);
+      }
+    });
 
     this.addGeometry(new GeometryRect());
     this._draw();
@@ -711,8 +771,8 @@ export default class Drawing extends DrawingBase {
   }
   // draw rectangle end ====================
 
-  drawEnd() {
-    if (!this._drawing) {
+  drawEnd(ignore) {
+    if (!this._drawing && !ignore) {
       return;
     }
 

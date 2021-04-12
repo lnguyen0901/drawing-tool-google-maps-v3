@@ -42,10 +42,19 @@ export default class GeometryRect extends GeometryBase {
     return this.width * this.height;
   }
 
-  constructor() {
+  get isValid() {
+    return this._first && this._coordinates.length >= 4;
+  }
+
+  constructor(data) {
     super();
     this._coordinates = [];
     this._first = [];
+
+    if (data) {
+      this._first = data.coordinates[0];
+      this._coordinates = data.coordinates;
+    }
   }
 
   setFirstPoint(point) {
@@ -97,6 +106,13 @@ export default class GeometryRect extends GeometryBase {
           [x2, y1]
         ];
       }
+    }
+  }
+
+  data() {
+    return {
+      type: 'rect',
+      coordinates: this.coordinates
     }
   }
 }

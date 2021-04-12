@@ -49,6 +49,10 @@ export default class Helper {
     return `translate(${mid[0]}, ${mid[1]}) rotate(${angle})`;
   }
 
+  computeOffset(point, distance, degree) {
+    return google.maps.geometry.spherical.computeOffset(new google.maps.LatLng(point[1], point[0]), distance, degree);
+  }
+
   /**
    * Calculate the distance in meters between two points.
    * @param p1

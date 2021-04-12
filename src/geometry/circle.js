@@ -50,12 +50,23 @@ export default class GeometryCircle extends GeometryBase {
     return Math.sqrt(Math.pow(a, 2) + Math.pow(b, 2));
   }
 
-  constructor(projection) {
+  get isValid() {
+    return this.center && this.center.length > 0 && this.endpoint && this.endpoint.length > 0;
+  }
+
+  constructor(projection, data) {
     super();
     this._projection = projection;
     this._center = [];
     this._endpoint = [];
     this._coordinates = [];
+
+    if (data) {
+      this._center = data.center;
+      this._coordinates[0] = this.center;
+      const endpoint = this._helper.computeOffset(this.center, data.radius, 0);
+      this.setEndPoint([endpoint.lng(), endpoint.lat()]);
+    }
   }
 
   setCenter(point) {
@@ -66,12 +77,23 @@ export default class GeometryCircle extends GeometryBase {
   setEndPoint(point) {
     this._endpoint = point;
     // set coordinates
-    const center = this._projection.latLngToSvgPoint(this.center);
-    const distance = this.svgRadius;
+    const radius = this._helper.computeLengthBetween(this.center, this.endpoint);
+    const north = this._helper.computeOffset(this.center, radius, 0);
+    const west = this._helper.computeOffset(this.center, radius, -90);
+    const south = this._helper.computeOffset(this.center, radius, 180);
+    const east = this._helper.computeOffset(this.center, radius, 90);
 
-    this._coordinates[1] = this._projection.svgPointToLatLng([center[0], center[1] + distance]);
-    this._coordinates[2] = this._projection.svgPointToLatLng([center[0] + distance, center[1]]);
-    this._coordinates[3] = this._projection.svgPointToLatLng([center[0], center[1] - distance]);
-    this._coordinates[4] = this._projection.svgPointToLatLng([center[0] - distance, center[1]]);
+    this._coordinates[1] = [north.lng(), north.lat()];
+    this._coordinates[2] = [east.lng(), east.lat()];
+    this._coordinates[3] = [south.lng(), south.lat()];
+    this._coordinates[4] = [west.lng(), west.lat()];
+  }
+
+  data() {
+    return {
+      type: 'circle',
+      center: this.center,
+      radius: this._helper.computeLengthBetween(this.center, this.endpoint)
+    }
   }
 }
