@@ -11,6 +11,10 @@ export default class GeometryPolygon extends GeometryBase {
     return nodes;
   }
 
+  get textNodes() {
+    return this.coordinates;
+  }
+
   get coordinates() {
     return Object.assign([], this._coordinates);
   }

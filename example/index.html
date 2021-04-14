@@ -35,6 +35,16 @@
         padding: 5px;
         font-family: Roboto, Arial, sans-serif;
       }
+      #overlapped {
+        position: absolute;
+        top: 5px;
+        left: calc(50% - 95px);
+        background-color: yellow;
+        font-family: Roboto, Arial, sans-serif;
+        font-size: 12px;
+        padding: 3px 5px;
+        display: none;
+      }
     </style>
   </head>
   <body>
@@ -46,6 +56,7 @@
       <button id="circle">Circle</button>
       <button id="polygon">Polygon</button>
     </div>
+    <div id="overlapped">Have some objects overlapped.</div>
     <div id="area"></div>
     <script src="../dist/gmaps-drawing-tool.umd.js"></script>
     <script>
@@ -63,6 +74,10 @@
         drawing.addListener('draw_end', (e) => {
           document.getElementById('area').innerHTML = e.areaText;
           // drawing.removeListener('draw_end');
+        });
+
+        drawing.addListener('overlapped', (e) => {
+          document.getElementById('overlapped').style.display = e ? 'block' : 'none';
         });
       }
 
@@ -85,10 +100,10 @@
         {
           type: 'rect',
           coordinates: [
-            [-71.90807983398436, 42.10985080225567],
-            [-71.05663940429686, 42.10985080225567],
-            [-71.05663940429686, 41.828041191965895],
-            [-71.90807983398436, 41.828041191965895]
+            [-71.20651245117188, 41.84603570059352],
+            [-70.35507202148438, 41.84603570059352],
+            [-70.35507202148438, 41.56305944220289],
+            [-71.20651245117188, 41.56305944220289]
           ]
         }
       ];

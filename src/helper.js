@@ -116,4 +116,23 @@ export default class Helper {
   _numberToLocale(number) {
     return new Intl.NumberFormat().format(number);
   }
+
+  static circlePoints(cx, cy, radius) {
+    let points = [];
+    for (let i = 0; i < 360; i++) {
+      const a = i * Math.PI / 180;
+      points.push([cx + radius * Math.cos(a), cy + radius * Math.sin(a)]);
+    }
+
+    return points;
+  }
+
+  static rectPoints(x, y, w, h) {
+    return [
+      [x, y],
+      [x + w, y],
+      [x + w, y + h],
+      [x, y + h]
+    ];
+  }
 }

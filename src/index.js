@@ -4,8 +4,9 @@ import DrawingBase from './drawing-base';
 import { DrawingConst } from './constants';
 import './index.scss';
 import Helper from './helper';
-import { EVENT_END } from './events';
+import { EVENT_END, EVENT_OVERLAPPED } from './events';
 import GeometryPolygon from './geometry/polygon';
+import { select } from 'd3-selection';
 
 const marginTopText = DrawingConst.marginTopText;
 
@@ -79,6 +80,10 @@ export default class Drawing extends DrawingBase {
           if (index) {
             this.removeGeometry(index);
           }
+
+          if (typeof this._events.get(EVENT_OVERLAPPED) === 'function') {
+            this._events.get(EVENT_OVERLAPPED)(this.checkIntersection());
+          }
           break;
       }
     });
@@ -142,6 +147,10 @@ export default class Drawing extends DrawingBase {
     this._curGeomIndex = 0;
     this._overlay.draw();
     this._dragged = false;
+
+    if (typeof this._events.get(EVENT_OVERLAPPED) === 'function') {
+      this._events.get(EVENT_OVERLAPPED)(this.checkIntersection());
+    }
   }
 
   data() {
@@ -151,6 +160,70 @@ export default class Drawing extends DrawingBase {
     });
 
     return data;
+  }
+
+  checkIntersection() {
+    let elements = [];
+
+    this._svgObjs.selectAll(`circle, rect, polygon`)
+    .each(function() {
+      const el = select(this);
+      elements.push(el._groups[0][0]);
+    });
+
+    if (elements.length === 0) {
+      return false;
+    }
+
+    const svg = this._svgOverlay.node();
+
+    for (let i = 0; i < elements.length; i++) {
+      const ele1 = elements[i];
+      const ele1Id = ele1.getAttribute('id');
+
+      let points = [];
+      // get points
+      switch(ele1.tagName) {
+        case 'circle':
+          const cx = Number(ele1.getAttribute('cx'));
+          const cy = Number(ele1.getAttribute('cy'));
+          const r = Number(ele1.getAttribute('r'));
+          points = Helper.circlePoints(cx, cy, r);
+          break;
+        case 'rect':
+          const x = Number(ele1.getAttribute('x'));
+          const y = Number(ele1.getAttribute('y'));
+          const w = Number(ele1.getAttribute('width'));
+          const h = Number(ele1.getAttribute('height'));
+          points = Helper.rectPoints(x, y, w, h);
+          break;
+        case 'polygon':
+          points = ele1.getAttribute('points').split(' ').map(e => e.split(',').map(f => Number(f)));
+          break;
+      }
+
+      for (let j = 0; j < elements.length; j++) {
+        const ele2 = elements[j];
+        const ele2Id = ele2.getAttribute('id');
+
+        if (ele1Id === ele2Id) {
+          continue;
+        }
+
+        for (let z = 0; z < points.length; z++) {
+          const p = points[z];
+          let point = svg.createSVGPoint();
+          point.x = p[0];
+          point.y = p[1];
+
+          if (ele2.isPointInFill(point) || ele2.isPointInStroke(point)) {
+            return true;
+          }
+        };
+      }
+    }
+
+    return false;
   }
 
   removeGeometry(index) {
@@ -215,7 +288,6 @@ export default class Drawing extends DrawingBase {
         this._overlay.draw();
 
         this._mapPolygonClickEvent = this._map.addListener('rightclick', () => {
-          // this.geometry().addPoint(this.geometry().nodes[0]);
           this.geometry().setClosed();
           this._mapClickEvent.remove();
           this._mapPolygonClickEvent.remove();
@@ -229,6 +301,10 @@ export default class Drawing extends DrawingBase {
 
   onCircleDragging(evt, i) {
     super.onCircleDragging(evt, i);
+
+    // if (typeof this._events.get(EVENT_OVERLAPPED) === 'function') {
+    //   this._events.get(EVENT_OVERLAPPED)(this.checkIntersection());
+    // }
 
     if (this.geometry() instanceof GeometryRect) {
       this._updateRectPosition(i, evt);
@@ -478,6 +554,32 @@ export default class Drawing extends DrawingBase {
       }
     }
 
+    const gcircles = this._svgObjs.selectAll('g[id^=gcircle-]')
+      .data(this.circles)
+      .attr('id', d => `gcircle-${d.id}`);
+
+    gcircles
+      .enter()
+      .append('g')
+      .attr('id', d => `gcircle-${d.id}`);
+
+    const lines = gcircles
+      .selectAll('line')
+      .data(d => this.geometry(d.id).lines)
+      .attr('class', 'base-line')
+      .attr('x1', d => this._projectionUtils.latLngToSvgPoint(d[0])[0])
+      .attr('y1', d => this._projectionUtils.latLngToSvgPoint(d[0])[1])
+      .attr('x2', d => this._projectionUtils.latLngToSvgPoint(d[1])[0])
+      .attr('y2', d => this._projectionUtils.latLngToSvgPoint(d[1])[1]);
+
+    lines.enter()
+      .append('line')
+      .attr('class', 'base-line')
+      .attr('x1', d => this._projectionUtils.latLngToSvgPoint(d[0])[0])
+      .attr('y1', d => this._projectionUtils.latLngToSvgPoint(d[0])[1])
+      .attr('x2', d => this._projectionUtils.latLngToSvgPoint(d[1])[0])
+      .attr('y2', d => this._projectionUtils.latLngToSvgPoint(d[1])[1]);
+
     this._updateSegmentTextCircle();
   }
 
@@ -540,6 +642,18 @@ export default class Drawing extends DrawingBase {
     circle.attr('cx', x)
       .attr('cy', y)
       .attr('r', r);
+
+    const gcircle = this._svgObjs.select(`g[id=gcircle-${this._curGeomIndex}`);
+
+    if (gcircle.size() === 0) {
+      return;
+    }
+
+    const line = gcircle.select('line');
+    line.attr('x1', x)
+      .attr('y1', y)
+      .attr('x2', x + r)
+      .attr('y2', y);
   }
 
   _updateCircleNode(i, evt) {
@@ -791,5 +905,11 @@ export default class Drawing extends DrawingBase {
       this._overlay.draw();
       this._dragged = false;
     });
+
+    if (!ignore) {
+      if (typeof this._events.get(EVENT_OVERLAPPED) === 'function') {
+        this._events.get(EVENT_OVERLAPPED)(this.checkIntersection());
+      }
+    }
   }
 }

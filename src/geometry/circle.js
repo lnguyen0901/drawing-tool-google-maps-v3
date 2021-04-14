@@ -5,6 +5,14 @@ export default class GeometryCircle extends GeometryBase {
     return this.coordinates;
   }
 
+  get textNodes() {
+    if (this.center) {
+      return [this.center];
+    }
+
+    return [];
+  }
+
   get coordinates() {
     return Object.assign([], this._coordinates);
   }

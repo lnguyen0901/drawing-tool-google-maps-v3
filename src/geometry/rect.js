@@ -19,6 +19,13 @@ export default class GeometryRect extends GeometryBase {
     return Object.assign([], this.coordinates);
   }
 
+  get textNodes() {
+    return [
+      this.coordinates[0],
+      this.coordinates[2]
+    ];
+  }
+
   get coordinates() {
     return Object.assign([], this._coordinates);
   }
@@ -112,7 +119,9 @@ export default class GeometryRect extends GeometryBase {
   data() {
     return {
       type: 'rect',
-      coordinates: this.coordinates
+      coordinates: this.coordinates,
+      width: this.width,
+      height: this.height
     }
   }
 }

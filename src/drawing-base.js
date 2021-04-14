@@ -3,6 +3,7 @@ import ProjectionUtility from './projection-utility';
 import { select } from 'd3-selection';
 import Helper from './helper';
 import { DrawingConst } from './constants';
+import { EVENT_OVERLAPPED } from './events';
 
 export default class DrawingBase {
 
@@ -12,6 +13,10 @@ export default class DrawingBase {
 
   get curNodes() {
     return Object.assign([], this.geometry() ? this.geometry().nodes : []);
+  }
+
+  get textNodes() {
+    return Object.assign([], this.geometry() ? this.geometry().textNodes : []);
   }
 
   constructor(map) {
@@ -107,6 +112,7 @@ export default class DrawingBase {
   _onDrawOverlay() {
     this._updateNodeCircles();
     this._updateNodeTouchCircles();
+    this._updateNodeText();
   }
 
   _updateNodeCircles() {
@@ -209,6 +215,53 @@ export default class DrawingBase {
       .call(this._onDragCircle());
   }
 
+  _updateNodeText() {
+    if (this._curGeomIndex <= 0) {
+      this._nodeText.selectAll('text').remove();
+      return;
+    }
+
+    let text = this._nodeText
+    .selectAll('text')
+    .data(this.textNodes)
+    .attr('class', ([, i]) => i === 0 ? `node-measure-text head-text` : 'node-measure-text')
+    .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'text-after-edge')
+    .attr('x', (d) => this._projectionUtils.latLngToSvgPoint(d)[0])
+    .attr('y', this._transformNodeTextY.bind(this))
+    .text((d) => {
+      const n1 = this._helper._roundUp(d[0], 4);
+      const n2 = this._helper._roundUp(d[1], 4);
+      return `${n1}, ${n2}`;
+    });
+
+    text
+      .enter()
+      .append('text')
+      .attr('class', ([, i]) => i === 0 ? `node-measure-text head-text` : 'node-measure-text')
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'text-after-edge')
+      .attr('x', (d) => this._projectionUtils.latLngToSvgPoint(d)[0])
+      .attr('y', this._transformNodeTextY.bind(this))
+      .text((d) => {
+        const n1 = this._helper._roundUp(d[0], 4);
+        const n2 = this._helper._roundUp(d[1], 4);
+        return `${n1}, ${n2}`;
+      });
+
+    text.exit().remove();
+  }
+
+  _transformNodeTextY(d, i) {
+    let offset;
+    if (i > 0 && this.curNodes[i - 1][1] > d[1]) {
+      offset = 23;
+    } else {
+      offset = -7;
+    }
+    return this._projectionUtils.latLngToSvgPoint(d)[1] + offset;
+  }
+
   _mapClickFunc() {
     this._overlay.draw();
     this._dragged = false;
@@ -303,13 +356,19 @@ export default class DrawingBase {
       isDragged = false;
       self._dragging = false;
       self._overlay.draw();
+
+      if (typeof self._events.get(EVENT_OVERLAPPED) === 'function') {
+        self._events.get(EVENT_OVERLAPPED)(self.checkIntersection());
+      }
     });
 
     return dragable;
   }
 
   onCircleDragging() {}
-  onCircleDragStart() {}
+  onCircleDragStart() {
+    this._nodeText.selectAll('text').remove();
+  }
   onCircleDragEnd() {}
 
   _disableMapScroll() {
