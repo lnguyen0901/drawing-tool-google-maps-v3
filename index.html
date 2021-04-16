@@ -50,7 +50,6 @@
   <body>
     <div id="map"></div>
     <div id="controls">
-      <button id="init">Init Data</button>
       <button id="data">Data</button>
       <button id="rectangle">Rectangle</button>
       <button id="circle">Circle</button>
@@ -58,7 +57,7 @@
     </div>
     <div id="overlapped">Have some objects overlapped.</div>
     <div id="area"></div>
-    <script src="./gmaps-drawing-tool.umd.js"></script>
+    <script src="../dist/gmaps-drawing-tool.umd.js"></script>
     <script>
       const center = { lat: 41.7, lng: -71.47 };
 
@@ -78,6 +77,10 @@
 
         drawing.addListener('overlapped', (e) => {
           document.getElementById('overlapped').style.display = e ? 'block' : 'none';
+        });
+
+        drawing.addListener('ready', () => {
+          drawing.setData(data);
         });
       }
 
@@ -108,9 +111,6 @@
         }
       ];
 
-      document
-        .querySelector('#init')
-        .addEventListener('click', () => drawing.setData(data));
       document
         .querySelector('#data')
         .addEventListener('click', () => console.log(drawing.data()));
