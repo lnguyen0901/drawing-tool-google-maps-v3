@@ -113,7 +113,7 @@
 
       document
         .querySelector('#data')
-        .addEventListener('click', () => console.log(drawing.data()));
+        .addEventListener('click', () => alert(JSON.stringify(drawing.data())));
       document
         .querySelector('#rectangle')
         .addEventListener('click', () => drawing.drawRectangle());
