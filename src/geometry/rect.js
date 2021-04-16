@@ -20,10 +20,14 @@ export default class GeometryRect extends GeometryBase {
   }
 
   get textNodes() {
-    return [
-      this.coordinates[0],
-      this.coordinates[2]
-    ];
+    if (this.coordinates.length > 1) {
+      return [
+        this.coordinates[0],
+        this.coordinates[2]
+      ];
+    }
+
+    return [this.coordinates[0]];
   }
 
   get coordinates() {
