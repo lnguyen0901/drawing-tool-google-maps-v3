@@ -3,7 +3,7 @@ import ProjectionUtility from './projection-utility';
 import { select } from 'd3-selection';
 import Helper from './helper';
 import { DrawingConst } from './constants';
-import { EVENT_OVERLAPPED } from './events';
+import { EVENT_OVERLAPPED, EVENT_READY } from './events';
 
 export default class DrawingBase {
 
@@ -107,6 +107,10 @@ export default class DrawingBase {
 
     // node text
     this._nodeText = this._svgOverlay.append('g').attr('class', 'node-text');
+
+    if (typeof this._events.get(EVENT_READY) === 'function') {
+      this._events.get(EVENT_READY)();
+    }
   }
 
   _onDrawOverlay() {

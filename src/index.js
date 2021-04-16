@@ -145,7 +145,7 @@ export default class Drawing extends DrawingBase {
     });
 
     this._curGeomIndex = 0;
-    this._overlay.draw();
+    // this._overlay.draw();
     this._dragged = false;
 
     if (typeof this._events.get(EVENT_OVERLAPPED) === 'function') {
